@@ -1,0 +1,25 @@
+7.983|so good day everyone I'm here to introduce our system
+14.635|so the main goal for work is to improve the presentation skills of the user
+17.868|is also to improve the conference in
+26.485|so for this except especially helpful for people like me who have difficulties in expressing their thoughts
+33.063|so what is that vantage for system compared to actual dream
+35.664|in doing some presentations
+44.005|the first problem is that we need to find an audience to listen to our presentation and give it back
+48.759|so our system can provide this audiences by
+50.616|a virtual avatar
+54.875|so we can simulate people listening to our percentage
+62.215|another disadvantage is to try and get close to the final environment as possible
+77.323|so that mean advantage of the system is that it's really easy to create with virtual environment that are as close to the real presentation stage as much as
+82.252|the last is advantage is that
+102.228|all the feedback depends on the audience so the feedback that you receive is limited to the experience and knowledge of the listening users listening audience so the main advantage of her system is that it will give accurate feedback because this is based from sensors and from
+103.602|feedback from the
+108.123|so for a user experience
+114.139|the user can do as many self presentations as he was possible
+119.056|end his able to receive real time feedback and accurate feedback
+124.548|empty can also see after each and every presentacion self
+129.162|representation of himself through avatar which action
+133.527|with this he can see his improvements overtime
+141.269|so to summarize everything the main features of our system is that it provides real time feedback
+144.202|it can record presentation
+147.845|and were able to review representations
+149.643|and analyze our feedback

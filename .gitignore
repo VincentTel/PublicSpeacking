@@ -58,3 +58,8 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+cudnn64_7.dll
+Assets/RP_Character/rp_eric_rigged_001/Materials/rp_eric_rigged_001_dif_gloss.tga
+Assets/RP_Character/rp_claudia_rigged_002/Materials/rp_claudia_rigged_002_dif_gloss.tga
+Assets/RP_Character/rp_carla_rigged_001/Materials/rp_carla_rigged_001_dif_gloss.tga
+dnn_model_2_0.onnx
