@@ -1,5 +1,5 @@
 using UnityEngine;
-//using Windows.Kinect;
+using Windows.Kinect;
 
 using System;
 using System.Collections;
@@ -92,7 +92,7 @@ namespace com.rfilkov.components
 
         // Variable to hold all them bones. It will initialize the same size as initialRotations.
         protected Transform[] bones;
-        //protected Transform[] fingerBones;
+        protected Transform[] fingerBones;
 
         // Rotations of the bones when the Kinect tracking starts.
         protected Quaternion[] initialRotations;
@@ -129,14 +129,17 @@ namespace com.rfilkov.components
 
         // private instance of the KinectManager
         protected KinectManager kinectManager;
-
-        //// last hand events
+        
+        // last hand events
         //private InteractionManager.HandEventType lastLeftHandEvent = InteractionManager.HandEventType.Release;
         //private InteractionManager.HandEventType lastRightHandEvent = InteractionManager.HandEventType.Release;
+        bool lastLeftHandIsGripped = true;
+        bool lastRightHandIsGripped = true;
 
-        //// fist states
-        //private bool bLeftFistDone = false;
-        //private bool bRightFistDone = false;
+        // fist states
+        private bool bLeftFistDone = false;
+        private bool bRightFistDone = false;
+        //--------------------------------------
 
         // grounder constants and variables
         private const int raycastLayers = ~2;  // Ignore Raycast
@@ -147,11 +150,11 @@ namespace com.rfilkov.components
         private float fFootDistanceInitial = 0f;
         private float fFootDistance = 0f;
         private float fFootDistanceTime = 0f;
+        private float handSize = 0f;
 
         // background plane rectangle
         private Rect planeRect = new Rect();
         private bool planeRectSet = false;
-
 
         /// <summary>
         /// Gets the number of bone transforms (array length).
@@ -285,7 +288,8 @@ namespace com.rfilkov.components
                 return;
 
             // inits the bones array
-            bones = new Transform[25];
+            //bones = new Transform[25];
+            bones = new Transform[31];
 
             // get the animator reference
             animatorComponent = GetComponent<Animator>();
@@ -336,7 +340,7 @@ namespace com.rfilkov.components
 
         public void Update()
         {
-            if(kinectManager == null)
+            if (kinectManager == null)
             {
                 kinectManager = KinectManager.Instance;
             }
@@ -458,34 +462,36 @@ namespace com.rfilkov.components
             //// get the left hand state and event
             //if (kinectManager && kinectManager.GetJointTrackingState(UserID, (int)KinectInterop.JointType.HandLeft) != KinectInterop.TrackingState.NotTracked)
             //{
-            //    KinectInterop.HandState leftHandState = kinectManager.GetLeftHandState(UserID);
-            //    InteractionManager.HandEventType leftHandEvent = InteractionManager.HandStateToEvent(leftHandState, lastLeftHandEvent);
+            //    //KinectInterop.HandState leftHandState = kinectManager.GetLeftHandState(UserID);
+            //    //InteractionManager.HandEventType leftHandEvent = InteractionManager.HandStateToEvent(leftHandState, lastLeftHandEvent);
 
-            //    if (leftHandEvent != InteractionManager.HandEventType.None)
-            //    {
-            //        lastLeftHandEvent = leftHandEvent;
-            //    }
+            //    //if (leftHandEvent != InteractionManager.HandEventType.None)
+            //    //{
+            //    //    lastLeftHandEvent = leftHandEvent;
+            //    //}
             //}
 
             //// get the right hand state and event
             //if (kinectManager && kinectManager.GetJointTrackingState(UserID, (int)KinectInterop.JointType.HandRight) != KinectInterop.TrackingState.NotTracked)
             //{
-            //    KinectInterop.HandState rightHandState = kinectManager.GetRightHandState(UserID);
-            //    InteractionManager.HandEventType rightHandEvent = InteractionManager.HandStateToEvent(rightHandState, lastRightHandEvent);
+            //    //KinectInterop.HandState rightHandState = kinectManager.GetRightHandState(UserID);
+            //    //InteractionManager.HandEventType rightHandEvent = InteractionManager.HandStateToEvent(rightHandState, lastRightHandEvent);
 
-            //    if (rightHandEvent != InteractionManager.HandEventType.None)
-            //    {
-            //        lastRightHandEvent = rightHandEvent;
-            //    }
+            //    //if (rightHandEvent != InteractionManager.HandEventType.None)
+            //    //{
+            //    //    lastRightHandEvent = rightHandEvent;
+            //    //}
             //}
 
             // rotate the avatar bones
             for (var boneIndex = 0; boneIndex < bones.Length; boneIndex++)
             {
-                if (!bones[boneIndex] || isBoneDisabled[boneIndex])
+                //if (!bones[boneIndex] || isBoneDisabled[boneIndex])
+                //    continue;
+                if (isBoneDisabled[boneIndex])
                     continue;
 
-                if (boneIndex2JointMap.ContainsKey(boneIndex))
+                if (boneIndex2JointMap.ContainsKey(boneIndex) && boneIndex < 28)
                 {
                     KinectInterop.JointType joint = !(mirroredMovement ^ flipLeftRight) ?
                         boneIndex2JointMap[boneIndex] : boneIndex2MirrorJointMap[boneIndex];
@@ -495,24 +501,57 @@ namespace com.rfilkov.components
                         continue;
                     }
 
-                    if (externalHandRotations &&    // skip hands if moved externally
-                        (joint == KinectInterop.JointType.WristLeft || joint == KinectInterop.JointType.WristRight ||
-                            joint == KinectInterop.JointType.HandLeft || joint == KinectInterop.JointType.HandRight))
-                    {
-                        continue;
-                    }
+                    //if (externalHandRotations &&    // skip hands if moved externally
+                    //    (joint == KinectInterop.JointType.WristLeft || joint == KinectInterop.JointType.WristRight ||
+                    //        joint == KinectInterop.JointType.HandLeft || joint == KinectInterop.JointType.HandRight))
+                    //{
+                    //    continue;
+                    //}
 
                     TransformBone(UserID, joint, boneIndex, !(mirroredMovement ^ flipLeftRight));
                 }
-                else if (boneIndex >= 21 && boneIndex <= 24)
+                //else if (boneIndex >= 21 && boneIndex <= 24) //for kinect v2
+                else if (boneIndex >= 28 && boneIndex <= 31) //for azure kinect
                 {
+                    if (boneIndex == 28)
+                    {
+                        Vector3 handTipLeft = kinectManager.GetJointPosition(UserID, 28);
+                        Vector3 handLeft = kinectManager.GetJointPosition(UserID, 8);
+
+                        float fingerDistance = (handTipLeft.x - handLeft.x) * (handTipLeft.x - handLeft.x) + (handTipLeft.y - handLeft.y) * (handTipLeft.y - handLeft.y) + (handTipLeft.z - handLeft.z) * (handTipLeft.z - handLeft.z);
+                        if (handSize < fingerDistance)
+                            handSize = fingerDistance;
+                        //Debug.Log("handSize:" + handSize);
+                        float grippedDistance = handSize / 1.6f;
+                        //Debug.Log("grippedDistance:" + grippedDistance);
+                        if (fingerDistance < grippedDistance)
+                            lastLeftHandIsGripped = true;
+                        else
+                            lastLeftHandIsGripped = false;
+
+                    }
+                    if (boneIndex == 30)
+                    {
+                        Vector3 handTipRight = kinectManager.GetJointPosition(UserID, 30);
+                        Vector3 handRight = kinectManager.GetJointPosition(UserID, 13);
+                        float fingerDistance = (handTipRight.x - handRight.x) * (handTipRight.x - handRight.x) + (handTipRight.y - handRight.y) * (handTipRight.y - handRight.y) + (handTipRight.z - handRight.z) * (handTipRight.z - handRight.z);
+                        if (handSize < fingerDistance)
+                            handSize = fingerDistance;
+                        float grippedDistance = handSize / 1.6f;
+                        if (fingerDistance < 0.025)
+                            lastRightHandIsGripped = true;
+                        else
+                            lastRightHandIsGripped = false;
+                    }
                     // fingers or thumbs
-                    if (fingerOrientations && !externalHandRotations)
+                    //if (fingerOrientations && !externalHandRotations)
+                    if (true)
                     {
                         KinectInterop.JointType joint = !(mirroredMovement ^ flipLeftRight) ?
                             boneIndex2FingerMap[boneIndex] : boneIndex2MirrorFingerMap[boneIndex];
 
                         TransformSpecialBoneFingers(UserID, (int)joint, boneIndex, !(mirroredMovement ^ flipLeftRight));
+
                     }
                 }
             }
@@ -667,49 +706,56 @@ namespace com.rfilkov.components
         // Apply the rotations tracked by kinect to fingers (one joint = multiple bones)
         protected void TransformSpecialBoneFingers(ulong userId, int joint, int boneIndex, bool flip)
         {
-            //// check for hand grips
-            //if (joint == (int)KinectInterop.JointType.HandtipLeft || joint == (int)KinectInterop.JointType.ThumbLeft)
-            //{
-            //    if (lastLeftHandEvent == InteractionManager.HandEventType.Grip)
-            //    {
-            //        if (!bLeftFistDone && !kinectManager.IsUserTurnedAround(userId))
-            //        {
-            //            float angleSign = !mirroredMovement /**(boneIndex == 21 || boneIndex == 22)*/ ? -1f : -1f;
-            //            float angleRot = angleSign * 60f;
+            // check for hand grips
+            if (joint == (int)KinectInterop.JointType.HandtipLeft || joint == (int)KinectInterop.JointType.ThumbLeft)
+            {
+                //if (lastLeftHandEvent == InteractionManager.HandEventType.Grip)
+                if (lastLeftHandIsGripped == true)
+                {
+                    //if (!bLeftFistDone && !kinectManager.IsUserTurnedAround(userId))
+                    if (!bLeftFistDone)
+                    {
+                        float angleSign = !mirroredMovement /**(boneIndex == 21 || boneIndex == 22)*/ ? -1f : -1f;
+                        float angleRot = angleSign * 60f;
 
-            //            TransformSpecialBoneFist(boneIndex, angleRot);
-            //            bLeftFistDone = (boneIndex >= 29);
-            //        }
+                        TransformSpecialBoneFist(boneIndex, angleRot);
+                        bLeftFistDone = (boneIndex >= 29);
+                    }
 
-            //        return;
-            //    }
-            //    else if (bLeftFistDone && lastLeftHandEvent == InteractionManager.HandEventType.Release)
-            //    {
-            //        TransformSpecialBoneUnfist(boneIndex);
-            //        bLeftFistDone = !(boneIndex >= 29);
-            //    }
-            //}
-            //else if (joint == (int)KinectInterop.JointType.HandtipRight || joint == (int)KinectInterop.JointType.ThumbRight)
-            //{
-            //    if (lastRightHandEvent == InteractionManager.HandEventType.Grip)
-            //    {
-            //        if (!bRightFistDone && !kinectManager.IsUserTurnedAround(userId))
-            //        {
-            //            float angleSign = !mirroredMovement /**(boneIndex == 21 || boneIndex == 22)*/ ? -1f : -1f;
-            //            float angleRot = angleSign * 60f;
+                    return;
+                }
+                //else if (bLeftFistDone && lastLeftHandEvent == InteractionManager.HandEventType.Release)
+                else if (bLeftFistDone && lastLeftHandIsGripped == false)
+                {
+                    TransformSpecialBoneUnfist(boneIndex);
+                    bLeftFistDone = !(boneIndex >= 29);
+                }
+            }
+            else if (joint == (int)KinectInterop.JointType.HandtipRight || joint == (int)KinectInterop.JointType.ThumbRight)
+            {
+                //if (lastRightHandEvent == InteractionManager.HandEventType.Grip)
+                if (lastRightHandIsGripped == true)
+                {
+                    //if (!bRightFistDone && !kinectManager.IsUserTurnedAround(userId))
+                    if (!bRightFistDone)
+                    {
+                        float angleSign = !mirroredMovement /**(boneIndex == 21 || boneIndex == 22)*/ ? -1f : -1f;
+                        float angleRot = angleSign * 60f;
 
-            //            TransformSpecialBoneFist(boneIndex, angleRot);
-            //            bRightFistDone = (boneIndex >= 29);
-            //        }
+                        TransformSpecialBoneFist(boneIndex, angleRot);
+                        bRightFistDone = (boneIndex >= 29);
+                    }
 
-            //        return;
-            //    }
-            //    else if (bRightFistDone && lastRightHandEvent == InteractionManager.HandEventType.Release)
-            //    {
-            //        TransformSpecialBoneUnfist(boneIndex);
-            //        bRightFistDone = !(boneIndex >= 29);
-            //    }
-            //}
+                    return;
+                }
+                //else if (bRightFistDone && lastRightHandEvent == InteractionManager.HandEventType.Release)
+                else if (bRightFistDone && lastRightHandIsGripped == false)
+                {
+                    TransformSpecialBoneUnfist(boneIndex);
+                    bRightFistDone = !(boneIndex >= 29);
+                }
+            }
+            //----------------------
 
             bool isJointTracked = kinectManager.IsJointTracked(userId, joint);
             if (!animatorComponent || !isJointTracked)
@@ -754,7 +800,8 @@ namespace com.rfilkov.components
             List<HumanBodyBones> alBones = boneIndex2MultiBoneMap[boneIndex];
             for (int i = 0; i < alBones.Count; i++)
             {
-                if (i < 1 && (boneIndex == 22 || boneIndex == 24))  // skip the first thumb bone
+                //if (i < 1 && (boneIndex == 22 || boneIndex == 24))  // skip the first thumb bone
+                if (i < 1 && (boneIndex == 29 || boneIndex == 31))  // skip the first thumb bone
                     continue;
 
                 HumanBodyBones bone = alBones[i];
@@ -1134,11 +1181,11 @@ namespace com.rfilkov.components
             Quaternion newRotation = jointRotation * initialRotations[boneIndex];
             //newRotation = initialRotation * newRotation;
 
-    //		if(offsetNode != null)
-    //		{
-    //			newRotation = offsetNode.transform.rotation * newRotation;
-    //		}
-    //		else
+            //		if(offsetNode != null)
+            //		{
+            //			newRotation = offsetNode.transform.rotation * newRotation;
+            //		}
+            //		else
             if (!externalRootMotion)  // fix by Mathias Parger
             {
                 newRotation = initialRotation * newRotation;
@@ -1219,8 +1266,8 @@ namespace com.rfilkov.components
                 fDistMin = 0f; // fFootDistanceInitial;
             }
 
-//		    Debug.Log (string.Format ("LFootY: {0:F2}, Dist: {1:F2}, RFootY: {2:F2}, Dist: {3:F2}, Min: {4:F2}", leftFoot ? leftFoot.position.y : 0f, fDistLeft,
-//						rightFoot ? rightFoot.position.y : 0f, fDistRight, fDistMin));
+            //		    Debug.Log (string.Format ("LFootY: {0:F2}, Dist: {1:F2}, RFootY: {2:F2}, Dist: {3:F2}, Min: {4:F2}", leftFoot ? leftFoot.position.y : 0f, fDistLeft,
+            //						rightFoot ? rightFoot.position.y : 0f, fDistRight, fDistMin));
 
             return fDistMin;
         }
@@ -1243,8 +1290,8 @@ namespace com.rfilkov.components
             {0, HumanBodyBones.Hips},
             {1, HumanBodyBones.Spine},
             {2, HumanBodyBones.Chest},
-		    {3, HumanBodyBones.Neck},
-    		{4, HumanBodyBones.Head},
+            {3, HumanBodyBones.Neck},
+            {4, HumanBodyBones.Head},
 
             {5, HumanBodyBones.LeftShoulder},
             {6, HumanBodyBones.LeftUpperArm},
@@ -1255,8 +1302,8 @@ namespace com.rfilkov.components
             {10, HumanBodyBones.RightUpperArm},
             {11, HumanBodyBones.RightLowerArm},
             {12, HumanBodyBones.RightHand},
-		
-		    {13, HumanBodyBones.LeftUpperLeg},
+
+            {13, HumanBodyBones.LeftUpperLeg},
             {14, HumanBodyBones.LeftLowerLeg},
             {15, HumanBodyBones.LeftFoot},
 //    		{16, HumanBodyBones.LeftToes},
@@ -1390,23 +1437,69 @@ namespace com.rfilkov.components
 
         protected static readonly Dictionary<int, KinectInterop.JointType> boneIndex2FingerMap = new Dictionary<int, KinectInterop.JointType>
         {
-            {21, KinectInterop.JointType.HandtipLeft},
-            {22, KinectInterop.JointType.ThumbLeft},
-            {23, KinectInterop.JointType.HandtipRight},
-            {24, KinectInterop.JointType.ThumbRight},
+            //{21, KinectInterop.JointType.HandtipLeft},
+            //{22, KinectInterop.JointType.ThumbLeft},
+            //{23, KinectInterop.JointType.HandtipRight},
+            //{24, KinectInterop.JointType.ThumbRight},
+            {28, KinectInterop.JointType.HandtipLeft},
+            {29, KinectInterop.JointType.ThumbLeft},
+            {30, KinectInterop.JointType.HandtipRight},
+            {31, KinectInterop.JointType.ThumbRight},
         };
 
         protected static readonly Dictionary<int, KinectInterop.JointType> boneIndex2MirrorFingerMap = new Dictionary<int, KinectInterop.JointType>
         {
-            {21, KinectInterop.JointType.HandtipRight},
-            {22, KinectInterop.JointType.ThumbRight},
-            {23, KinectInterop.JointType.HandtipLeft},
-            {24, KinectInterop.JointType.ThumbLeft},
+            //{21, KinectInterop.JointType.HandtipRight},
+            //{22, KinectInterop.JointType.ThumbRight},
+            //{23, KinectInterop.JointType.HandtipLeft},
+            //{24, KinectInterop.JointType.ThumbLeft},
+            {28, KinectInterop.JointType.HandtipRight},
+            {29, KinectInterop.JointType.ThumbRight},
+            {30, KinectInterop.JointType.HandtipLeft},
+            {31, KinectInterop.JointType.ThumbLeft},
         };
 
         protected static readonly Dictionary<int, List<HumanBodyBones>> boneIndex2MultiBoneMap = new Dictionary<int, List<HumanBodyBones>>
         {
-            {21, new List<HumanBodyBones> {  // left fingers
+        //    {21, new List<HumanBodyBones> {  // left fingers
+				    //HumanBodyBones.LeftIndexProximal,
+        //            HumanBodyBones.LeftIndexIntermediate,
+        //            HumanBodyBones.LeftIndexDistal,
+        //            HumanBodyBones.LeftMiddleProximal,
+        //            HumanBodyBones.LeftMiddleIntermediate,
+        //            HumanBodyBones.LeftMiddleDistal,
+        //            HumanBodyBones.LeftRingProximal,
+        //            HumanBodyBones.LeftRingIntermediate,
+        //            HumanBodyBones.LeftRingDistal,
+        //            HumanBodyBones.LeftLittleProximal,
+        //            HumanBodyBones.LeftLittleIntermediate,
+        //            HumanBodyBones.LeftLittleDistal,
+        //        }},
+        //    {22, new List<HumanBodyBones> {  // left thumb
+				    //HumanBodyBones.LeftThumbProximal,
+        //            HumanBodyBones.LeftThumbIntermediate,
+        //            HumanBodyBones.LeftThumbDistal,
+        //        }},
+        //    {23, new List<HumanBodyBones> {  // right fingers
+				    //HumanBodyBones.RightIndexProximal,
+        //            HumanBodyBones.RightIndexIntermediate,
+        //            HumanBodyBones.RightIndexDistal,
+        //            HumanBodyBones.RightMiddleProximal,
+        //            HumanBodyBones.RightMiddleIntermediate,
+        //            HumanBodyBones.RightMiddleDistal,
+        //            HumanBodyBones.RightRingProximal,
+        //            HumanBodyBones.RightRingIntermediate,
+        //            HumanBodyBones.RightRingDistal,
+        //            HumanBodyBones.RightLittleProximal,
+        //            HumanBodyBones.RightLittleIntermediate,
+        //            HumanBodyBones.RightLittleDistal,
+        //        }},
+        //    {24, new List<HumanBodyBones> {  // right thumb
+				    //HumanBodyBones.RightThumbProximal,
+        //            HumanBodyBones.RightThumbIntermediate,
+        //            HumanBodyBones.RightThumbDistal,
+        //        }},
+            {28, new List<HumanBodyBones> {  // left fingers
 				    HumanBodyBones.LeftIndexProximal,
                     HumanBodyBones.LeftIndexIntermediate,
                     HumanBodyBones.LeftIndexDistal,
@@ -1420,12 +1513,12 @@ namespace com.rfilkov.components
                     HumanBodyBones.LeftLittleIntermediate,
                     HumanBodyBones.LeftLittleDistal,
                 }},
-            {22, new List<HumanBodyBones> {  // left thumb
+            {29, new List<HumanBodyBones> {  // left thumb
 				    HumanBodyBones.LeftThumbProximal,
                     HumanBodyBones.LeftThumbIntermediate,
                     HumanBodyBones.LeftThumbDistal,
                 }},
-            {23, new List<HumanBodyBones> {  // right fingers
+            {30, new List<HumanBodyBones> {  // right fingers
 				    HumanBodyBones.RightIndexProximal,
                     HumanBodyBones.RightIndexIntermediate,
                     HumanBodyBones.RightIndexDistal,
@@ -1439,7 +1532,7 @@ namespace com.rfilkov.components
                     HumanBodyBones.RightLittleIntermediate,
                     HumanBodyBones.RightLittleDistal,
                 }},
-            {24, new List<HumanBodyBones> {  // right thumb
+            {31, new List<HumanBodyBones> {  // right thumb
 				    HumanBodyBones.RightThumbProximal,
                     HumanBodyBones.RightThumbIntermediate,
                     HumanBodyBones.RightThumbDistal,
